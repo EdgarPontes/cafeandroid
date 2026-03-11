@@ -466,7 +466,15 @@ fun RankingPodium(ranking: List<RankingItem>) {
 @Composable
 fun PodiumItem(item: RankingItem, position: Int, height: androidx.compose.ui.unit.Dp) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(item.nome.split(" ").firstOrNull() ?: "", fontWeight = FontWeight.Bold, color = Color.White)
+        val displayName = remember(item.nome) {
+            val parts = item.nome.split(" ").filter { it.isNotEmpty() }
+            if (parts.size >= 2) {
+                "${parts[0]} ${parts[1].take(1)}."
+            } else {
+                item.nome
+            }
+        }
+        Text(displayName, fontWeight = FontWeight.Bold, color = Color.White)
         Box(
             modifier = Modifier
                 .width(80.dp)
