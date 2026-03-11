@@ -37,12 +37,13 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
 
     fun loadInitialData() {
         viewModelScope.launch {
-            try {
-                _funcionarios.value = repository.getFuncionarios()
-                _ranking.value = repository.getRanking()
-            } catch (e: Exception) {
-                // Handle error
-            }
+            // First sync with API to update the local DB
+            repository.syncFuncionarios()
+            repository.syncOfflineConsumos()
+            
+            // Then load the updated local data for the UI
+            _funcionarios.value = repository.getFuncionarios()
+            _ranking.value = repository.getRanking()
         }
     }
 
@@ -65,7 +66,6 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
             try {
                 val response = repository.registrarConsumo(funcionario.codigo, valor)
                 _consumoStatus.value = UiState.Success(response.message)
-                // Refresh ranking
                 _ranking.value = repository.getRanking()
             } catch (e: Exception) {
                 _consumoStatus.value = UiState.Error(e.message ?: "Erro desconhecido")
