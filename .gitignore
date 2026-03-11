@@ -1,0 +1,45 @@
+# Built artifacts
+bin
+gen
+out
+build/
+.gradle/
+/local.properties
+/captures
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+.shelf
+/out
+
+# Android Studio 3.x and above
+.cxx/
+.externalNativeBuild/
+
+# Gradle
+.gradle/
+build/
+
+# Kotlin
+.kotlin/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Keystore files (Keep your secrets safe!)
+*.jks
+*.keystore
+*.p12
+
+# Google Services
+google-services.json
+
+# Local properties
+local.properties
