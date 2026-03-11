@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.sgsistemas.cafesg.data.Funcionario
 import br.com.sgsistemas.cafesg.data.RankingItem
+import androidx.compose.material.icons.filled.Search
 
 // Theme Colors
 val DarkBackground = Color(0xFF121212)
@@ -54,6 +54,7 @@ fun CafeSGApp(
     Box(modifier = Modifier
         .fillMaxSize()
         .background(DarkBackground)
+        .systemBarsPadding()
         .padding(16.dp)) {
         
         Column(
@@ -80,16 +81,21 @@ fun CafeSGApp(
             )
 
             if (selectedFuncionario == null) {
+                // Spacer above search to push it to center
+                Spacer(modifier = Modifier.weight(1f))
+
                 UserSearch(
                     funcionarios = funcionarios,
                     onFuncionarioSelected = { viewModel.selectFuncionario(it) }
                 )
 
+                // Spacer below search to keep it in center
                 Spacer(modifier = Modifier.weight(1f))
 
                 RankingPodium(ranking = ranking.take(3))
                 
-                Spacer(modifier = Modifier.height(40.dp))
+                // Dinamic space: 10dp above the system navigation bars
+                Spacer(modifier = Modifier.height(10.dp))
             }
         }
 
