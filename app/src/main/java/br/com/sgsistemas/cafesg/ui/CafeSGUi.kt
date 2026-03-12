@@ -247,94 +247,139 @@ fun UserHeaderCard(funcionario: Funcionario) {
 }
 
 @Composable
-fun ValueSelectionCard(onValueSelected: (Double) -> Unit, onCancel: () -> Unit) {
+fun ValueSelectionCard(
+    onValueSelected: (Double) -> Unit,
+    onCancel: () -> Unit
+) {
+
     var customValue by remember { mutableStateOf("") }
-    
+
+    val valuesHistory = remember { mutableStateListOf<Double>() }
+
+    val total = valuesHistory.sum()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         shape = RoundedCornerShape(16.dp)
     ) {
+
         Column(
             modifier = Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
             Text(
-                text = "Selecione o Valor",
+                text = "Adicionar Créditos",
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 fontWeight = FontWeight.Medium
             )
-            
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Total",
+                color = Color.Gray
+            )
+
+            Text(
+                text = "R$ %.2f".format(total),
+                style = MaterialTheme.typography.headlineLarge,
+                color = GoldTan,
+                fontWeight = FontWeight.Bold
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
-            
-            val values = listOf(0.25, 0.50, 1.00, 1.25, 1.50, 2.00)
-            
+
+            val values = listOf(0.25, 0.50, 1.00)
+
             Column {
+
                 for (i in 0 until values.size step 2) {
+
                     Row(modifier = Modifier.fillMaxWidth()) {
+
                         ValueButton(
                             value = values[i],
-                            onClick = { onValueSelected(values[i]) },
-                            modifier = Modifier.weight(1f).padding(4.dp)
+                            onClick = { valuesHistory.add(values[i]) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(4.dp)
                         )
+
                         if (i + 1 < values.size) {
+
                             ValueButton(
                                 value = values[i + 1],
-                                onClick = { onValueSelected(values[i + 1]) },
-                                modifier = Modifier.weight(1f).padding(4.dp)
+                                onClick = { valuesHistory.add(values[i + 1]) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(4.dp)
                             )
                         }
                     }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = "Ou digite outro valor:",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = customValue,
-                    onValueChange = { customValue = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("0.00", color = Color.Gray) },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White, textAlign = TextAlign.Center),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFF1A1A1A),
-                        focusedContainerColor = Color(0xFF1A1A1A),
-                        unfocusedBorderColor = Color.DarkGray,
-                        focusedBorderColor = GoldTan
-                    ),
-                    singleLine = true
-                )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
+
                 Button(
-                    onClick = { 
-                        customValue.toDoubleOrNull()?.let { onValueSelected(it) }
-                    },
-                    modifier = Modifier.height(56.dp).weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28488E)),
-                    shape = RoundedCornerShape(8.dp)
+                    onClick = { valuesHistory.clear() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(4.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF7A1F1F)
+                    )
                 ) {
-                    Text("Confirmar", fontWeight = FontWeight.Bold)
+                    Text("Limpar")
+                }
+
+                Button(
+                    onClick = {
+                        if (valuesHistory.isNotEmpty()) {
+                            valuesHistory.removeAt(valuesHistory.lastIndex)
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(4.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF444444)
+                    )
+                ) {
+                    Text("Desfazer")
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
+            Button(
+                onClick = {
+
+                    if (total > 0) {
+                        onValueSelected(total)
+                    }
+
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GoldTan
+                )
+            ) {
+                Text(
+                    "Confirmar",
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 text = "Cancelar",
                 modifier = Modifier.clickable { onCancel() },
