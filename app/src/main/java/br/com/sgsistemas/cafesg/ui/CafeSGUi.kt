@@ -206,7 +206,12 @@ fun UserHeaderCard(funcionario: Funcionario) {
                         .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    val initials = funcionario.nome.split(" ")
+                    val cleanName = if (funcionario.nome.startsWith("VISITANTE (")) {
+                        funcionario.nome.removePrefix("VISITANTE (").removeSuffix(")")
+                    } else {
+                        funcionario.nome
+                    }
+                    val initials = cleanName.split(" ")
                         .filter { it.isNotEmpty() }
                         .take(2)
                         .map { it.first().uppercase() }
@@ -237,7 +242,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "#${funcionario.codigo}",
+                    text = if (funcionario.codigo == "999999") "VISITANTE" else "#${funcionario.codigo}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
@@ -414,87 +419,133 @@ fun UserSearch(
     onFuncionarioSelected: (Funcionario) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    var isVisitor by remember { mutableStateOf(false) }
+    
     val filtered = if (query.isEmpty()) emptyList() else funcionarios.filter {
         it.nome.contains(query, ignoreCase = true) || it.codigo.contains(query)
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Buscar Funcionário", color = Color.Gray) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = GoldTan,
-                unfocusedBorderColor = Color.DarkGray
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.weight(1f),
+                label = { Text("Buscar...", color = Color.Gray) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = GoldTan,
+                    unfocusedBorderColor = Color.DarkGray
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
-        )
+
+            Button(
+                onClick = {
+                    if (query.isNotEmpty()) {
+                        // Ao clicar em AVANÇAR, sempre considera como visitante com o nome digitado
+                        onFuncionarioSelected(Funcionario(codigo = "999999", nome = "VISITANTE ($query)"))
+                        query = ""
+                    }
+                },
+                modifier = Modifier.height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GoldTan),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("AVANÇAR", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .clickable { isVisitor = !isVisitor },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = isVisitor,
+                onCheckedChange = { isVisitor = it },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = GoldTan,
+                    uncheckedColor = Color.Gray
+                )
+            )
+            Text(
+                text = "Selecionar como visitante",
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
 
         if (filtered.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
-                color = CardBackground,
-                tonalElevation = 8.dp,
-                shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
-            ) {
-                LazyColumn {
-                    items(filtered) { funcionario ->
-                        ListItem(
-                            headlineContent = { Text(funcionario.nome, color = Color.White) },
-                            supportingContent = { Text("#${funcionario.codigo}", color = Color.Gray) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier.clickable {
-                                onFuncionarioSelected(funcionario)
-                                query = ""
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                filtered.take(3).forEach { funcionario ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .clickable {
+                                    val finalFunc = if (isVisitor) {
+                                        Funcionario(codigo = "999999", nome = "VISITANTE (${funcionario.nome})")
+                                    } else {
+                                        funcionario
+                                    }
+                                    onFuncionarioSelected(finalFunc)
+                                    query = ""
+                                }
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = funcionario.nome.uppercase(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                text = "Código/RFID: ${funcionario.codigo}",
+                                color = Color.Gray,
+                                fontSize = 14.sp
+                            )
+                            if (isVisitor) {
+                                Text(
+                                    text = "SELECIONADO COMO VISITANTE",
+                                    color = GoldTan,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }
-        } else if (query.isNotEmpty()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-                    .clickable {
-                        onFuncionarioSelected(Funcionario(codigo = "999999", nome = "VISITANTE"))
-                        query = ""
-                    }
-            ) {
-                Checkbox(
-                    checked = false,
-                    onCheckedChange = { checked ->
-                        if (checked) {
-                            onFuncionarioSelected(Funcionario(codigo = "999999", nome = "VISITANTE"))
-                            query = ""
-                        }
-                    },
-                    colors = CheckboxDefaults.colors(
-                        uncheckedColor = Color.Gray,
-                        checkedColor = GoldTan,
-                        checkmarkColor = Color.White
-                    )
-                )
-                Text(
-                    text = "Visitante?",
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
         }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "TOP 3 CONSUMIDORES (MÊS)",
+            color = Color.Gray,
+            fontSize = 12.sp,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
 @Composable
 fun RankingPodium(ranking: List<RankingItem>) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Ranking de Consumo", style = MaterialTheme.typography.headlineSmall, color = GoldTan)
         Spacer(modifier = Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -519,7 +570,7 @@ fun PodiumItem(item: RankingItem, position: Int, height: androidx.compose.ui.uni
                 item.nome
             }
         }
-        Text(displayName, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(displayName, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
         Box(
             modifier = Modifier
                 .width(80.dp)
@@ -534,9 +585,8 @@ fun PodiumItem(item: RankingItem, position: Int, height: androidx.compose.ui.uni
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text(position.toString(), fontSize = 32.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text(position.toString() + "º", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.5f))
         }
-        Text("R$ ${String.format("%.2f", item.total)}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     }
 }
 
