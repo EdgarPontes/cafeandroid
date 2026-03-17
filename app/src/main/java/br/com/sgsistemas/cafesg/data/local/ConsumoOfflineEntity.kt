@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class ConsumoOfflineEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val codigo: String,
+    val nome: String,
     val valor: Double,
     val timestamp: Long = System.currentTimeMillis()
 )

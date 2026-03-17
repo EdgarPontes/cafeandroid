@@ -54,7 +54,6 @@ fun CafeSGApp(
     Box(modifier = Modifier
         .fillMaxSize()
         .background(DarkBackground)
-        .systemBarsPadding()
         .padding(16.dp)) {
         
         Column(
@@ -206,12 +205,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
                         .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    val cleanName = if (funcionario.nome.startsWith("VISITANTE (")) {
-                        funcionario.nome.removePrefix("VISITANTE (").removeSuffix(")")
-                    } else {
-                        funcionario.nome
-                    }
-                    val initials = cleanName.split(" ")
+                    val initials = funcionario.nome.split(" ")
                         .filter { it.isNotEmpty() }
                         .take(2)
                         .map { it.first().uppercase() }
@@ -236,7 +230,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
             
             Column {
                 Text(
-                    text = funcionario.nome.uppercase(),
+                    text = if (funcionario.codigo == "999999") "VISITANTE: ${funcionario.nome.uppercase()}" else funcionario.nome.uppercase(),
                     style = MaterialTheme.typography.titleLarge,
                     color = GoldTan,
                     fontWeight = FontWeight.Bold
@@ -449,8 +443,8 @@ fun UserSearch(
             Button(
                 onClick = {
                     if (query.isNotEmpty()) {
-                        // Ao clicar em AVANÇAR, sempre considera como visitante com o nome digitado
-                        onFuncionarioSelected(Funcionario(codigo = "999999", nome = "VISITANTE ($query)"))
+                        // Ao clicar em AVANÇAR, considera como visitante com o texto da busca
+                        onFuncionarioSelected(Funcionario(codigo = "999999", nome = query))
                         query = ""
                     }
                 },
@@ -497,7 +491,8 @@ fun UserSearch(
                             modifier = Modifier
                                 .clickable {
                                     val finalFunc = if (isVisitor) {
-                                        Funcionario(codigo = "999999", nome = "VISITANTE (${funcionario.nome})")
+                                        // Envia o nome real do funcionário, mas com o código de visitante
+                                        Funcionario(codigo = "999999", nome = funcionario.nome)
                                     } else {
                                         funcionario
                                     }

@@ -8,7 +8,7 @@ class SettingsManager(context: Context) {
 
     companion object {
         private const val KEY_BASE_URL = "base_url"
-        private const val DEFAULT_URL = "http://192.168.2.100:8090/"
+        private const val DEFAULT_URL = "http://192.168.1.252:8000"
     }
 
     fun getBaseUrl(): String {

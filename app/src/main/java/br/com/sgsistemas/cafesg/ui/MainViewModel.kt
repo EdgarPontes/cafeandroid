@@ -64,7 +64,7 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
         viewModelScope.launch {
             _consumoStatus.value = UiState.Loading
             try {
-                val response = repository.registrarConsumo(funcionario.codigo, valor)
+                val response = repository.registrarConsumo(funcionario.codigo, funcionario.nome, valor)
                 _consumoStatus.value = UiState.Success(response.message)
                 _ranking.value = repository.getRanking()
             } catch (e: Exception) {

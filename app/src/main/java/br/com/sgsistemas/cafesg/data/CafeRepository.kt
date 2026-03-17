@@ -67,13 +67,13 @@ class CafeRepository(
         }
     }
 
-    suspend fun registrarConsumo(codigo: String, valor: Double): ConsumoResponse {
+    suspend fun registrarConsumo(codigo: String, nome: String, valor: Double): ConsumoResponse {
         return try {
-            val response = api.registrarConsumo(ConsumoRequest(codigo, valor))
+            val response = api.registrarConsumo(ConsumoRequest(codigo, nome, valor))
             syncOfflineConsumos()
             response
         } catch (e: Exception) {
-            consumoOfflineDao.insert(ConsumoOfflineEntity(codigo = codigo, valor = valor))
+            consumoOfflineDao.insert(ConsumoOfflineEntity(codigo = codigo, nome = nome, valor = valor))
             ConsumoResponse("Consumo salvo localmente (modo offline)", -1)
         }
     }
@@ -84,7 +84,7 @@ class CafeRepository(
         
         pending.forEach { consumo ->
             try {
-                api.registrarConsumo(ConsumoRequest(consumo.codigo, consumo.valor))
+                api.registrarConsumo(ConsumoRequest(consumo.codigo, consumo.nome, consumo.valor))
                 consumoOfflineDao.delete(consumo)
             } catch (e: Exception) {
                 Log.e("CafeRepository", "Erro ao sincronizar consumo offline")

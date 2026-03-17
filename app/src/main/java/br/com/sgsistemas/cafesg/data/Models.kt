@@ -10,6 +10,7 @@ data class Funcionario(
 
 data class ConsumoRequest(
     val codigo: String,
+    val nome: String,
     val valor: Double
 )
 
