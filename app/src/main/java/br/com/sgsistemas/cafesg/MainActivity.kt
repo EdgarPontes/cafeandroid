@@ -9,6 +9,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -62,17 +63,30 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CafeSGTheme {
+                // Estado observável para o ranking e IP
+                var isRankingEnabled by remember { mutableStateOf(settingsManager.isRankingEnabled()) }
+                var currentIp by remember { mutableStateOf(settingsManager.getBaseUrl()) }
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     CafeSGApp(
                         viewModel = viewModel,
-                        currentIp = settingsManager.getBaseUrl(),
-                        onIpChanged = { newIp ->
+                        currentIp = currentIp,
+                        isRankingEnabled = isRankingEnabled,
+                        onConfigChanged = { newIp, rankingEnabled ->
+                            // Salva nas preferências
                             settingsManager.setBaseUrl(newIp)
+                            settingsManager.setRankingEnabled(rankingEnabled)
+                            
+                            // Atualiza os estados para refletir na UI imediatamente
+                            currentIp = settingsManager.getBaseUrl()
+                            isRankingEnabled = rankingEnabled
+                            
+                            // Atualiza o repositório no ViewModel
                             val newRepo = CafeRepository(
-                                settingsManager.getBaseUrl(),
+                                currentIp,
                                 database.funcionarioDao(),
                                 database.consumoOfflineDao()
                             )

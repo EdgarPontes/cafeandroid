@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
@@ -20,8 +21,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,7 +45,8 @@ val AvatarLime = Color(0xFFC0CA33)
 fun CafeSGApp(
     viewModel: MainViewModel,
     currentIp: String,
-    onIpChanged: (String) -> Unit
+    isRankingEnabled: Boolean,
+    onConfigChanged: (String, Boolean) -> Unit
 ) {
     val selectedFuncionario by viewModel.selectedFuncionario.collectAsState()
     val ranking by viewModel.ranking.collectAsState()
@@ -55,7 +60,7 @@ fun CafeSGApp(
         .fillMaxSize()
         .background(DarkBackground)
         .padding(16.dp)) {
-        
+
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -66,7 +71,7 @@ fun CafeSGApp(
                 color = GoldTan,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
-                    .padding(vertical = 32.dp)
+                    .padding(top = 16.dp, bottom = 16.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
@@ -80,20 +85,22 @@ fun CafeSGApp(
             )
 
             if (selectedFuncionario == null) {
-                // Spacer above search to push it to center
-                Spacer(modifier = Modifier.weight(1f))
+                // Layout puxado para o topo
+                Spacer(modifier = Modifier.height(8.dp))
 
                 UserSearch(
                     funcionarios = funcionarios,
+                    isRankingEnabled = isRankingEnabled,
                     onFuncionarioSelected = { viewModel.selectFuncionario(it) }
                 )
 
-                // Spacer below search to keep it in center
+                // Spacer que empurra o ranking para baixo
                 Spacer(modifier = Modifier.weight(1f))
 
-                RankingPodium(ranking = ranking.take(3))
-                
-                // Dinamic space: 10dp above the system navigation bars
+                if (isRankingEnabled) {
+                    RankingPodium(ranking = ranking.take(3))
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
             }
         }
@@ -138,9 +145,10 @@ fun CafeSGApp(
         if (showIpDialog) {
             IpConfigDialog(
                 currentIp = currentIp,
+                currentRankingEnabled = isRankingEnabled,
                 onDismiss = { showIpDialog = false },
-                onConfirm = { 
-                    onIpChanged(it)
+                onConfirm = { ip, enabled ->
+                    onConfigChanged(ip, enabled)
                     showIpDialog = false
                 }
             )
@@ -151,17 +159,19 @@ fun CafeSGApp(
 @Composable
 fun IpConfigDialog(
     currentIp: String,
+    currentRankingEnabled: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String, Boolean) -> Unit
 ) {
     var ipText by remember { mutableStateOf(currentIp) }
+    var rankingEnabled by remember { mutableStateOf(currentRankingEnabled) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Configurar IP da API") },
+        title = { Text("Configurações do Sistema") },
         text = {
             Column {
-                Text("Digite o novo IP ou URL:")
+                Text("IP ou URL da API:")
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = ipText,
@@ -170,10 +180,23 @@ fun IpConfigDialog(
                     singleLine = true,
                     placeholder = { Text("ex: 192.168.1.100:8000") }
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { rankingEnabled = !rankingEnabled }
+                ) {
+                    Checkbox(
+                        checked = rankingEnabled,
+                        onCheckedChange = { rankingEnabled = it }
+                    )
+                    Text("Exibir Ranking de Consumo", modifier = Modifier.padding(start = 8.dp))
+                }
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(ipText) }) {
+            Button(onClick = { onConfirm(ipText, rankingEnabled) }) {
                 Text("Salvar")
             }
         },
@@ -205,7 +228,12 @@ fun UserHeaderCard(funcionario: Funcionario) {
                         .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    val initials = funcionario.nome.split(" ")
+                    val cleanName = if (funcionario.nome.startsWith("VISITANTE (")) {
+                        funcionario.nome.removePrefix("VISITANTE (").removeSuffix(")")
+                    } else {
+                        funcionario.nome
+                    }
+                    val initials = cleanName.split(" ")
                         .filter { it.isNotEmpty() }
                         .take(2)
                         .map { it.first().uppercase() }
@@ -225,9 +253,9 @@ fun UserHeaderCard(funcionario: Funcionario) {
                         .border(2.dp, CardBackground, CircleShape)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column {
                 Text(
                     text = if (funcionario.codigo == "999999") "VISITANTE: ${funcionario.nome.uppercase()}" else funcionario.nome.uppercase(),
@@ -410,16 +438,62 @@ fun ValueButton(value: Double, onClick: () -> Unit, modifier: Modifier = Modifie
 @Composable
 fun UserSearch(
     funcionarios: List<Funcionario>,
+    isRankingEnabled: Boolean,
     onFuncionarioSelected: (Funcionario) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var isVisitor by remember { mutableStateOf(false) }
-    
-    val filtered = if (query.isEmpty()) emptyList() else funcionarios.filter {
-        it.nome.contains(query, ignoreCase = true) || it.codigo.contains(query)
+    var showError by remember { mutableStateOf(false) }
+
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val filtered = remember(query, funcionarios) {
+        if (query.length < 3) {
+            emptyList()
+        } else {
+            val isNumeric = query.all { it.isDigit() }
+            if (isNumeric) {
+                funcionarios.filter { it.codigo.contains(query) }
+            } else {
+                funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
+            }
+        }
+    }
+
+    val onSearchAction = {
+        if (query.isNotEmpty()) {
+            val isNumeric = query.all { it.isDigit() }
+            val match = if (isNumeric) {
+                funcionarios.find { it.codigo == query }
+            } else {
+                funcionarios.find { it.nome.equals(query, ignoreCase = true) }
+            }
+
+            if (match != null) {
+                val finalFunc = if (isVisitor) {
+                    Funcionario(codigo = "999999", nome = match.nome)
+                } else {
+                    match
+                }
+                onFuncionarioSelected(finalFunc)
+                query = ""
+                showError = false
+            } else {
+                showError = true
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(), // Faz a coluna ocupar a tela toda verticalmente
+        verticalArrangement = Arrangement.Center // Centraliza o conteúdo no meio
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -427,10 +501,22 @@ fun UserSearch(
         ) {
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.weight(1f),
+                onValueChange = { input ->
+                    query = input
+                    showError = false
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
                 label = { Text("Buscar...", color = Color.Gray) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Search
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = { onSearchAction() }
+                ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
@@ -441,19 +527,22 @@ fun UserSearch(
             )
 
             Button(
-                onClick = {
-                    if (query.isNotEmpty()) {
-                        // Ao clicar em AVANÇAR, considera como visitante com o texto da busca
-                        onFuncionarioSelected(Funcionario(codigo = "999999", nome = query))
-                        query = ""
-                    }
-                },
+                onClick = { onSearchAction() },
                 modifier = Modifier.height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GoldTan),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("AVANÇAR", color = Color.Black, fontWeight = FontWeight.Bold)
             }
+        }
+
+        if (showError) {
+            Text(
+                text = "Usuário não encontrado. É obrigatório informar um usuário válido.",
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp, start = 8.dp)
+            )
         }
 
         Row(
@@ -491,7 +580,6 @@ fun UserSearch(
                             modifier = Modifier
                                 .clickable {
                                     val finalFunc = if (isVisitor) {
-                                        // Envia o nome real do funcionário, mas com o código de visitante
                                         Funcionario(codigo = "999999", nome = funcionario.nome)
                                     } else {
                                         funcionario
@@ -526,15 +614,17 @@ fun UserSearch(
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = "TOP 3 CONSUMIDORES (MÊS)",
-            color = Color.Gray,
-            fontSize = 12.sp,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
-        )
+
+        if (isRankingEnabled) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "TOP 3 CONSUMIDORES (MÊS)",
+                color = Color.Gray,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
