@@ -6,16 +6,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.sgsistemas.cafesg.data.Funcionario
 import br.com.sgsistemas.cafesg.data.RankingItem
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 // Theme Colors
 val DarkBackground = Color(0xFF121212)
@@ -235,9 +230,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
                     }
                     val initials = cleanName.split(" ")
                         .filter { it.isNotEmpty() }
-                        .take(2)
-                        .map { it.first().uppercase() }
-                        .joinToString("")
+                        .take(2).joinToString("") { it.first().uppercase() }
                     Text(
                         text = initials,
                         fontSize = 32.sp,
@@ -452,14 +445,15 @@ fun UserSearch(
     }
 
     val filtered = remember(query, funcionarios) {
-        if (query.length < 3) {
-            emptyList()
-        } else {
+
             val isNumeric = query.all { it.isDigit() }
             if (isNumeric) {
                 funcionarios.filter { it.codigo.contains(query) }
             } else {
-                funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
+                if (query.length < 3) {
+                    emptyList()
+                } else {
+                    funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
             }
         }
     }
@@ -490,14 +484,19 @@ fun UserSearch(
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(), // Faz a coluna ocupar a tela toda verticalmente
-        verticalArrangement = Arrangement.Center // Centraliza o conteúdo no meio
+            .fillMaxSize() // Ocupa a tela toda para permitir o uso de weights
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // ESPAÇADOR SUPERIOR: Empurra a busca para o centro quando não há resultados
+        if (query.isEmpty()) {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        // BLOCO DE BUSCA
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = query,
@@ -506,7 +505,7 @@ fun UserSearch(
                     showError = false
                 },
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth() // Agora ocupa a largura total
                     .focusRequester(focusRequester),
                 label = { Text("Buscar...", color = Color.Gray) },
                 singleLine = true,
@@ -515,7 +514,7 @@ fun UserSearch(
                     imeAction = ImeAction.Search
                 ),
                 keyboardActions = KeyboardActions(
-                    onSearch = { onSearchAction() }
+                    onSearch = { onSearchAction() } // O teclado ainda aciona a busca
                 ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
@@ -525,15 +524,6 @@ fun UserSearch(
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
-
-            Button(
-                onClick = { onSearchAction() },
-                modifier = Modifier.height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GoldTan),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("AVANÇAR", color = Color.Black, fontWeight = FontWeight.Bold)
-            }
         }
 
         if (showError) {
@@ -568,62 +558,72 @@ fun UserSearch(
             )
         }
 
-        if (filtered.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                filtered.take(3).forEach { funcionario ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .clickable {
-                                    val finalFunc = if (isVisitor) {
-                                        Funcionario(codigo = "999999", nome = funcionario.nome)
-                                    } else {
-                                        funcionario
-                                    }
-                                    onFuncionarioSelected(finalFunc)
-                                    query = ""
-                                }
-                                .padding(16.dp)
+        // ÁREA DINÂMICA (RESULTADOS OU RANKING)
+        // Usamos weight(2f) para garantir que esta área apareça abaixo da busca
+        Column(
+            modifier = Modifier
+                .weight(2f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (query.isNotEmpty() && filtered.isNotEmpty()) {
+                // Lista de resultados da busca
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    filtered.take(3).forEach { funcionario ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(
-                                text = funcionario.nome.uppercase(),
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                            Text(
-                                text = "Código/RFID: ${funcionario.codigo}",
-                                color = Color.Gray,
-                                fontSize = 14.sp
-                            )
-                            if (isVisitor) {
+                            Column(
+                                modifier = Modifier
+                                    .clickable {
+                                        val finalFunc = if (isVisitor) {
+                                            Funcionario(codigo = "999999", nome = funcionario.nome)
+                                        } else {
+                                            funcionario
+                                        }
+                                        onFuncionarioSelected(finalFunc)
+                                        query = ""
+                                    }
+                                    .padding(16.dp)
+                            ) {
                                 Text(
-                                    text = "SELECIONADO COMO VISITANTE",
-                                    color = GoldTan,
+                                    text = funcionario.nome.uppercase(),
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    fontSize = 18.sp
+                                )
+                                Text(
+                                    text = "Código/RFID: ${funcionario.codigo}",
+                                    color = Color.Gray,
+                                    fontSize = 14.sp
                                 )
                             }
                         }
                     }
                 }
-            }
-        }
+            } else if (isRankingEnabled) {
+                // RANKING (Só aparece se a busca estiver vazia)
+                Spacer(modifier = Modifier.height(120.dp))
+                Text(
+                    text = "TOP 3 CONSUMIDORES (MÊS)",
+                    color = Color.Gray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
 
-        if (isRankingEnabled) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "TOP 3 CONSUMIDORES (MÊS)",
-                color = Color.Gray,
-                fontSize = 12.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
+                Spacer(modifier = Modifier.height(80.dp))
+
+                val rankingData = funcionarios
+                    .sortedByDescending { it.codigo }
+                    .take(3)
+                    .map { RankingItem(nome = it.nome, total = 0.0) }
+
+                RankingPodium(ranking = rankingData)
+            }
         }
     }
 }
