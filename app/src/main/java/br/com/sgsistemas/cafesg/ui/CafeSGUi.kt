@@ -44,7 +44,7 @@ fun CafeSGApp(
     onConfigChanged: (String, Boolean) -> Unit
 ) {
     val selectedFuncionario by viewModel.selectedFuncionario.collectAsState()
-    val ranking by viewModel.ranking.collectAsState()
+    val ranking by viewModel.ranking.collectAsState() // Aqui você pega o ranking do ViewModel
     val funcionarios by viewModel.funcionarios.collectAsState()
     val status by viewModel.consumoStatus.collectAsState()
 
@@ -80,23 +80,15 @@ fun CafeSGApp(
             )
 
             if (selectedFuncionario == null) {
-                // Layout puxado para o topo
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // CORREÇÃO: Passando o ranking para dentro do UserSearch
                 UserSearch(
                     funcionarios = funcionarios,
+                    ranking = ranking, // <-- Adicione este parâmetro
                     isRankingEnabled = isRankingEnabled,
                     onFuncionarioSelected = { viewModel.selectFuncionario(it) }
                 )
-
-                // Spacer que empurra o ranking para baixo
-                Spacer(modifier = Modifier.weight(1f))
-
-                if (isRankingEnabled) {
-                    RankingPodium(ranking = ranking.take(3))
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
             }
         }
 
@@ -251,7 +243,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
 
             Column {
                 Text(
-                    text = if (funcionario.codigo == "999999") "VISITANTE: ${funcionario.nome.uppercase()}" else funcionario.nome.uppercase(),
+                    text = if (funcionario.codigo == "999999") "${funcionario.nome.uppercase()}" else funcionario.nome.uppercase(),
                     style = MaterialTheme.typography.titleLarge,
                     color = GoldTan,
                     fontWeight = FontWeight.Bold
@@ -431,6 +423,7 @@ fun ValueButton(value: Double, onClick: () -> Unit, modifier: Modifier = Modifie
 @Composable
 fun UserSearch(
     funcionarios: List<Funcionario>,
+    ranking: List<RankingItem>, // <-- ADICIONADO PARÂMETRO AQUI
     isRankingEnabled: Boolean,
     onFuncionarioSelected: (Funcionario) -> Unit
 ) {
@@ -444,17 +437,14 @@ fun UserSearch(
         focusRequester.requestFocus()
     }
 
+    // Lógica de filtro corrigida (removido erro de chaves)
     val filtered = remember(query, funcionarios) {
-
-            val isNumeric = query.all { it.isDigit() }
-            if (isNumeric) {
-                funcionarios.filter { it.codigo.contains(query) }
-            } else {
-                if (query.length < 3) {
-                    emptyList()
-                } else {
-                    funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
-            }
+        val isNumeric = query.all { it.isDigit() }
+        if (isNumeric) {
+            funcionarios.filter { it.codigo.contains(query) }
+        } else {
+            if (query.length < 3) emptyList()
+            else funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
         }
     }
 
@@ -483,55 +473,45 @@ fun UserSearch(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize() // Ocupa a tela toda para permitir o uso de weights
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ESPAÇADOR SUPERIOR: Empurra a busca para o centro quando não há resultados
+        // Se a busca estiver vazia, empurra para o meio
         if (query.isEmpty()) {
             Spacer(modifier = Modifier.weight(1f))
         }
 
-        // BLOCO DE BUSCA
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { input ->
-                    query = input
-                    showError = false
-                },
-                modifier = Modifier
-                    .fillMaxWidth() // Agora ocupa a largura total
-                    .focusRequester(focusRequester),
-                label = { Text("Buscar...", color = Color.Gray) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Search
-                ),
-                keyboardActions = KeyboardActions(
-                    onSearch = { onSearchAction() } // O teclado ainda aciona a busca
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedBorderColor = GoldTan,
-                    unfocusedBorderColor = Color.DarkGray
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-        }
+        OutlinedTextField(
+            value = query,
+            onValueChange = { input ->
+                query = input
+                showError = false
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
+            label = { Text("Buscar...", color = Color.Gray) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Search
+            ),
+            keyboardActions = KeyboardActions(onSearch = { onSearchAction() }),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = GoldTan,
+                unfocusedBorderColor = Color.DarkGray
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
 
         if (showError) {
             Text(
-                text = "Usuário não encontrado. É obrigatório informar um usuário válido.",
+                text = "Usuário não encontrado.",
                 color = Color.Red,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp, start = 8.dp)
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
 
@@ -542,87 +522,60 @@ fun UserSearch(
                 .clickable { isVisitor = !isVisitor },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(
-                checked = isVisitor,
-                onCheckedChange = { isVisitor = it },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = GoldTan,
-                    uncheckedColor = Color.Gray
-                )
-            )
-            Text(
-                text = "Selecionar como visitante",
-                color = Color.White,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(start = 4.dp)
-            )
+            Checkbox(checked = isVisitor, onCheckedChange = { isVisitor = it }, colors = CheckboxDefaults.colors(checkedColor = GoldTan))
+            Text(text = "Selecionar como visitante", color = Color.White, fontSize = 14.sp)
         }
 
-        // ÁREA DINÂMICA (RESULTADOS OU RANKING)
-        // Usamos weight(2f) para garantir que esta área apareça abaixo da busca
+        // CONTEÚDO DINÂMICO
         Column(
-            modifier = Modifier
-                .weight(2f)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.Top,
+            modifier = Modifier.weight(2f).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (query.isNotEmpty() && filtered.isNotEmpty()) {
-                // Lista de resultados da busca
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    filtered.take(3).forEach { funcionario ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f)),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .clickable {
-                                        val finalFunc = if (isVisitor) {
-                                            Funcionario(codigo = "999999", nome = funcionario.nome)
-                                        } else {
-                                            funcionario
-                                        }
-                                        onFuncionarioSelected(finalFunc)
-                                        query = ""
-                                    }
-                                    .padding(16.dp)
-                            ) {
-                                Text(
-                                    text = funcionario.nome.uppercase(),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
-                                )
-                                Text(
-                                    text = "Código/RFID: ${funcionario.codigo}",
-                                    color = Color.Gray,
-                                    fontSize = 14.sp
-                                )
-                            }
+            if (query.isNotEmpty()) {
+                // Resultados da Busca
+                // Resultados da Busca
+                filtered.take(3).forEach { funcionario ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                // Se a checkbox de visitante estiver marcada, altera o objeto enviado
+                                val finalFunc = if (isVisitor) {
+                                    Funcionario(
+                                        codigo = "999999",
+                                        nome = "${funcionario.nome} (VISITANTE)"
+                                    )
+                                } else {
+                                    funcionario
+                                }
+                                onFuncionarioSelected(finalFunc)
+                                query = ""
+                            },
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(funcionario.nome.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Código: ${funcionario.codigo}", color = Color.Gray)
                         }
                     }
                 }
             } else if (isRankingEnabled) {
-                // RANKING (Só aparece se a busca estiver vazia)
-                Spacer(modifier = Modifier.height(120.dp))
+                // RODAPÉ: RANKING REAL
+                Spacer(modifier = Modifier.weight(1f)) // Empurra para o rodapé
+
                 Text(
                     text = "TOP 3 CONSUMIDORES (MÊS)",
                     color = Color.Gray,
                     fontSize = 12.sp,
-                    modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(80.dp))
+                // Agora usamos o ranking que veio por parâmetro!
+                RankingPodium(ranking = ranking.take(3))
 
-                val rankingData = funcionarios
-                    .sortedByDescending { it.codigo }
-                    .take(3)
-                    .map { RankingItem(nome = it.nome, total = 0.0) }
-
-                RankingPodium(ranking = rankingData)
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
