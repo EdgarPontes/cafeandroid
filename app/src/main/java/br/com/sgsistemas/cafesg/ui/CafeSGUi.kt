@@ -349,7 +349,9 @@ fun ValueSelectionCard(
                         containerColor = Color(0xFF7A1F1F)
                     )
                 ) {
-                    Text("Limpar")
+                    Text("Limpar",
+                        color = Color.White
+                    )
                 }
 
                 Button(
@@ -365,7 +367,9 @@ fun ValueSelectionCard(
                         containerColor = Color(0xFF444444)
                     )
                 ) {
-                    Text("Desfazer")
+                    Text("Desfazer",
+                    color = Color.White
+                    )
                 }
             }
 
@@ -386,7 +390,8 @@ fun ValueSelectionCard(
             ) {
                 Text(
                     "Confirmar",
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
 
@@ -566,7 +571,7 @@ fun UserSearch(
 
                 Text(
                     text = "TOP 3 CONSUMIDORES (MÊS)",
-                    color = Color.Gray,
+                    color = Color.White,
                     fontSize = 12.sp,
                     textAlign = TextAlign.Center
                 )
