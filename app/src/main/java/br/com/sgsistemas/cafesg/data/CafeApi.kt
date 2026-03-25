@@ -23,4 +23,7 @@ interface CafeApi {
 
     @GET("api/ranking/mes")
     suspend fun getRankingMes(): List<RankingItem>
+
+    @POST("api/fotos")
+    suspend fun sendPhoto(@Body request: FotoRequest): FotoResponse
 }

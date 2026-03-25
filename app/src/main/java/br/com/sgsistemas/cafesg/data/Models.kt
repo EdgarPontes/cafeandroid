@@ -23,3 +23,13 @@ data class RankingItem(
     @SerializedName("NOME") val nome: String,
     @SerializedName("TOTAL") val total: Double
 )
+
+data class FotoRequest(
+    val codigo: String,
+    val imagem: String,
+    val formato: String = "jpg"
+)
+
+data class FotoResponse(
+    val message: String
+)
