@@ -8,6 +8,9 @@ import br.com.sgsistemas.cafesg.data.local.FuncionarioEntity
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
+import br.com.sgsistemas.cafesg.BuildConfig
 
 class CafeRepository(
     baseUrl: String,
@@ -17,8 +20,15 @@ class CafeRepository(
     private var api: CafeApi = createApi(baseUrl)
 
     private fun createApi(baseUrl: String): CafeApi {
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(BuildConfig.API_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(BuildConfig.API_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(BuildConfig.API_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+
         return Retrofit.Builder()
             .baseUrl(baseUrl)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(CafeApi::class.java)
