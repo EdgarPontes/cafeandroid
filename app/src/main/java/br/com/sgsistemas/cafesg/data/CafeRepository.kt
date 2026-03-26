@@ -7,6 +7,7 @@ import br.com.sgsistemas.cafesg.data.local.FuncionarioDao
 import br.com.sgsistemas.cafesg.data.local.FuncionarioEntity
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOException
 
 class CafeRepository(
     baseUrl: String,
@@ -39,13 +40,19 @@ class CafeRepository(
 
     suspend fun syncFuncionarios() {
         Log.d("CafeRepository", "Iniciando sincronização global de funcionários...")
-        val response = api.getFuncionarios()
-        val entities = response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) }
-        
-        // Usando replaceAll para garantir que quem não veio na API seja removido do banco local
-        funcionarioDao.replaceAll(entities)
-        
-        Log.d("CafeRepository", "Sincronização concluída: ${entities.size} funcionários salvos (antigos removidos).")
+        try {
+            val response = api.getFuncionarios()
+            val entities = response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) }
+            
+            // Usando replaceAll para garantir que quem não veio na API seja removido do banco local
+            funcionarioDao.replaceAll(entities)
+            
+            Log.d("CafeRepository", "Sincronização concluída: ${entities.size} funcionários salvos (antigos removidos).")
+        } catch (e: IOException) {
+            Log.e("CafeRepository", "Falha na sincronização global (rede): ${e.message}. Usando dados locais.")
+        } catch (e: Exception) {
+            Log.e("CafeRepository", "Falha na sincronização global (outros erros): ${e.message}")
+        }
     }
 
     suspend fun getFuncionarios(): List<Funcionario> {
@@ -53,9 +60,17 @@ class CafeRepository(
         return if (cached.isNotEmpty()) {
             cached.map { Funcionario(it.codigo, it.nome, it.rfid) }
         } else {
-            val response = api.getFuncionarios()
-            funcionarioDao.insertAll(response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) })
-            response
+            try {
+                val response = api.getFuncionarios()
+                funcionarioDao.insertAll(response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) })
+                response
+            } catch (e: IOException) {
+                Log.e("CafeRepository", "Falha ao buscar funcionários da API (rede): ${e.message}. Retornando lista vazia.")
+                emptyList()
+            } catch (e: Exception) {
+                Log.e("CafeRepository", "Falha ao buscar funcionários da API (outros erros): ${e.message}. Retornando lista vazia.")
+                emptyList()
+            }
         }
     }
 
@@ -95,6 +110,14 @@ class CafeRepository(
     }
 
     suspend fun getRanking(): List<RankingItem> {
-        return api.getRankingMes()
+        return try {
+            api.getRankingMes()
+        } catch (e: IOException) {
+            Log.e("CafeRepository", "Falha ao buscar ranking da API (rede): ${e.message}. Retornando lista vazia.")
+            emptyList()
+        } catch (e: Exception) {
+            Log.e("CafeRepository", "Falha ao buscar ranking da API (outros erros): ${e.message}. Retornando lista vazia.")
+            emptyList()
+        }
     }
 }
