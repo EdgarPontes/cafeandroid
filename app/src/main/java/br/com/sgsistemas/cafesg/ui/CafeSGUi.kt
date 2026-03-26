@@ -1,8 +1,5 @@
 package br.com.sgsistemas.cafesg.ui
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,11 +28,6 @@ import br.com.sgsistemas.cafesg.data.Funcionario
 import br.com.sgsistemas.cafesg.data.RankingItem
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.FileProvider
-import java.io.File
-import java.util.Date
-import android.util.Base64
 
 // Theme Colors
 val DarkBackground = Color(0xFF121212)
@@ -52,7 +44,7 @@ fun CafeSGApp(
     onConfigChanged: (String, Boolean) -> Unit
 ) {
     val selectedFuncionario by viewModel.selectedFuncionario.collectAsState()
-    val ranking by viewModel.ranking.collectAsState()
+    val ranking by viewModel.ranking.collectAsState() // Aqui você pega o ranking do ViewModel
     val funcionarios by viewModel.funcionarios.collectAsState()
     val status by viewModel.consumoStatus.collectAsState()
 
@@ -88,23 +80,15 @@ fun CafeSGApp(
             )
 
             if (selectedFuncionario == null) {
-                // Layout puxado para o topo
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // CORREÇÃO: Passando o ranking para dentro do UserSearch
                 UserSearch(
                     funcionarios = funcionarios,
+                    ranking = ranking, // <-- Adicione este parâmetro
                     isRankingEnabled = isRankingEnabled,
                     onFuncionarioSelected = { viewModel.selectFuncionario(it) }
                 )
-
-                // Spacer que empurra o ranking para baixo
-                Spacer(modifier = Modifier.weight(1f))
-
-                if (isRankingEnabled) {
-                    RankingPodium(ranking = ranking.take(3))
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
             }
         }
 
@@ -130,9 +114,7 @@ fun CafeSGApp(
                         UserHeaderCard(funcionario)
                         Spacer(modifier = Modifier.height(16.dp))
                         ValueSelectionCard(
-                            onValueSelected = { valor, uri ->
-                                viewModel.registrarConsumo(valor, uri)
-                            },
+                            onValueSelected = { viewModel.registrarConsumo(it) },
                             onCancel = { viewModel.selectFuncionario(null) }
                         )
                     }
@@ -278,51 +260,15 @@ fun UserHeaderCard(funcionario: Funcionario) {
 
 @Composable
 fun ValueSelectionCard(
-    onValueSelected: (Double, String?) -> Unit, // Alterado para aceitar String? para Base64
+    onValueSelected: (Double) -> Unit,
     onCancel: () -> Unit
 ) {
 
-    val context = LocalContext.current
+    var customValue by remember { mutableStateOf("") }
 
     val valuesHistory = remember { mutableStateListOf<Double>() }
 
     val total = valuesHistory.sum()
-
-    // Estado para armazenar a URI da foto
-    var photoUri by remember { mutableStateOf<Uri?>(null) }
-
-    // Launcher para abrir a câmera
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture(),
-        onResult = { success ->
-            if (success) {
-                // Se a foto foi tirada com sucesso, converte para Base64 e finaliza o processo
-                photoUri?.let { uri ->
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val bytes = inputStream?.readBytes()
-                    inputStream?.close()
-                    
-                    if (bytes != null) {
-                        val base64Image = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                        onValueSelected(total, base64Image)
-                    } else {
-                        onValueSelected(total, null) // Não foi possível ler a imagem
-                    }
-                } ?: onValueSelected(total, null) // URI nula
-            } else {
-                onValueSelected(total, null) // Foto não foi tirada ou cancelada
-            }
-        }
-    )
-
-    // Função para criar o arquivo da foto
-    fun createImageUri(): Uri {
-        val directory = File(context.externalCacheDir, "Pictures")
-        if (!directory.exists()) directory.mkdirs()
-        val file = File.createTempFile("comprovante_${Date().time}", ".jpg", directory)
-        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    }
-
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -433,14 +379,7 @@ fun ValueSelectionCard(
                 onClick = {
 
                     if (total > 0) {
-                        // 1. Cria o caminho do arquivo
-                        val uri = createImageUri()
-                        photoUri = uri
-                        // 2. Dispara a câmera
-                        cameraLauncher.launch(uri)
-                    } else {
-                        // Se não há valor, apenas fecha a tela de seleção
-                        onCancel()
+                        onValueSelected(total)
                     }
 
                 },
@@ -489,6 +428,7 @@ fun ValueButton(value: Double, onClick: () -> Unit, modifier: Modifier = Modifie
 @Composable
 fun UserSearch(
     funcionarios: List<Funcionario>,
+    ranking: List<RankingItem>, // <-- ADICIONADO PARÂMETRO AQUI
     isRankingEnabled: Boolean,
     onFuncionarioSelected: (Funcionario) -> Unit
 ) {
@@ -502,16 +442,14 @@ fun UserSearch(
         focusRequester.requestFocus()
     }
 
+    // Lógica de filtro corrigida (removido erro de chaves)
     val filtered = remember(query, funcionarios) {
         val isNumeric = query.all { it.isDigit() }
-        if (query.isEmpty()) {
-            emptyList()
-        } else if (isNumeric) {
+        if (isNumeric) {
             funcionarios.filter { it.codigo.contains(query) }
-        } else if (query.length < 3) {
-            emptyList()
         } else {
-            funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
+            if (query.length < 3) emptyList()
+            else funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
         }
     }
 
@@ -603,58 +541,47 @@ fun UserSearch(
                 // Resultados da Busca
                 filtered.take(3).forEach { funcionario ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .clickable {
-                                    val finalFunc = if (isVisitor) {
-                                        Funcionario(codigo = "999999", nome = funcionario.nome)
-                                    } else {
-                                        funcionario
-                                    }
-                                    onFuncionarioSelected(finalFunc)
-                                    query = ""
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                // Se a checkbox de visitante estiver marcada, altera o objeto enviado
+                                val finalFunc = if (isVisitor) {
+                                    Funcionario(
+                                        codigo = "999999",
+                                        nome = "${funcionario.nome} (VISITANTE)"
+                                    )
+                                } else {
+                                    funcionario
                                 }
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = funcionario.nome.uppercase(),
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                            Text(
-                                text = "Código/RFID: ${funcionario.codigo}",
-                                color = Color.Gray,
-                                fontSize = 14.sp
-                            )
-                            if (isVisitor) {
-                                Text(
-                                    text = "SELECIONADO COMO VISITANTE",
-                                    color = GoldTan,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
+                                onFuncionarioSelected(finalFunc)
+                                query = ""
+                            },
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(funcionario.nome.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Código: ${funcionario.codigo}", color = Color.Gray)
                         }
                     }
                 }
-            }
-        }
+            } else if (isRankingEnabled) {
+                // RODAPÉ: RANKING REAL
+                Spacer(modifier = Modifier.weight(1f)) // Empurra para o rodapé
 
-        if (isRankingEnabled) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "TOP 3 CONSUMIDORES (MÊS)",
-                color = Color.Gray,
-                fontSize = 12.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
+                Text(
+                    text = "TOP 3 CONSUMIDORES (MÊS)",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Agora usamos o ranking que veio por parâmetro!
+                RankingPodium(ranking = ranking.take(3))
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }

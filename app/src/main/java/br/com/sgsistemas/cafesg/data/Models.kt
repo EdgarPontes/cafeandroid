@@ -6,7 +6,11 @@ data class Funcionario(
     val codigo: String,
     val nome: String,
     val rfid: String? = null
-)
+) {
+    fun displayCodigo(): String {
+        return if (codigo.contains(":")) codigo.split(":")[1] else codigo
+    }
+}
 
 data class ConsumoRequest(
     val codigo: String,
