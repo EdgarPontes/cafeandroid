@@ -38,18 +38,14 @@ class CafeRepository(
     }
 
     suspend fun syncFuncionarios() {
-        try {
-            Log.d("CafeRepository", "Iniciando sincronização global de funcionários...")
-            val response = api.getFuncionarios()
-            val entities = response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) }
-            
-            // Usando replaceAll para garantir que quem não veio na API seja removido do banco local
-            funcionarioDao.replaceAll(entities)
-            
-            Log.d("CafeRepository", "Sincronização concluída: ${entities.size} funcionários salvos (antigos removidos).")
-        } catch (e: Exception) {
-            Log.e("CafeRepository", "Falha na sincronização global: ${e.message}")
-        }
+        Log.d("CafeRepository", "Iniciando sincronização global de funcionários...")
+        val response = api.getFuncionarios()
+        val entities = response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) }
+        
+        // Usando replaceAll para garantir que quem não veio na API seja removido do banco local
+        funcionarioDao.replaceAll(entities)
+        
+        Log.d("CafeRepository", "Sincronização concluída: ${entities.size} funcionários salvos (antigos removidos).")
     }
 
     suspend fun getFuncionarios(): List<Funcionario> {
@@ -57,13 +53,9 @@ class CafeRepository(
         return if (cached.isNotEmpty()) {
             cached.map { Funcionario(it.codigo, it.nome, it.rfid) }
         } else {
-            try {
-                val response = api.getFuncionarios()
-                funcionarioDao.insertAll(response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) })
-                response
-            } catch (e: Exception) {
-                emptyList()
-            }
+            val response = api.getFuncionarios()
+            funcionarioDao.insertAll(response.map { FuncionarioEntity(it.codigo, it.nome, it.rfid) })
+            response
         }
     }
 
@@ -102,9 +94,7 @@ class CafeRepository(
         }
     }
 
-    suspend fun getRanking() = try {
-        api.getRankingMes()
-    } catch (e: Exception) {
-        emptyList<RankingItem>()
+    suspend fun getRanking(): List<RankingItem> {
+        return api.getRankingMes()
     }
 }

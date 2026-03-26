@@ -249,7 +249,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (funcionario.codigo == "999999") "VISITANTE" else "#${funcionario.codigo}",
+                    text = if (funcionario.codigo == "999999") "VISITANTE" else "#${funcionario.displayCodigo()}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
@@ -446,9 +446,9 @@ fun UserSearch(
     val filtered = remember(query, funcionarios) {
         val isNumeric = query.all { it.isDigit() }
         if (isNumeric) {
-            funcionarios.filter { it.codigo.contains(query) }
+            funcionarios.filter { it.displayCodigo().contains(query) }
         } else {
-            if (query.length < 3) emptyList()
+            if (query.isEmpty()) emptyList() // Changed from query.length < 3
             else funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
         }
     }
@@ -457,7 +457,7 @@ fun UserSearch(
         if (query.isNotEmpty()) {
             val isNumeric = query.all { it.isDigit() }
             val match = if (isNumeric) {
-                funcionarios.find { it.codigo == query }
+                funcionarios.find { it.displayCodigo() == query }
             } else {
                 funcionarios.find { it.nome.equals(query, ignoreCase = true) }
             }
@@ -561,7 +561,7 @@ fun UserSearch(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(funcionario.nome.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-                            Text("Código: ${funcionario.codigo}", color = Color.Gray)
+                            Text("Código: ${funcionario.displayCodigo()}", color = Color.Gray)
                         }
                     }
                 }
