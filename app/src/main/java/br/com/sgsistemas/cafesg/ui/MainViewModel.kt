@@ -82,20 +82,12 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
         }
     }
 
-    fun registrarConsumo(valor: Double, base64Image: String?) {
+    fun registrarConsumo(valor: Double) {
         val funcionario = _selectedFuncionario.value ?: return
         viewModelScope.launch {
             _consumoStatus.value = UiState.Loading
             try {
                 val response = repository.registrarConsumo(funcionario.codigo, funcionario.nome, valor)
-
-                base64Image?.let { image ->
-                    // Envia a foto após registrar o consumo
-                    val photoStatus = sendPhoto(funcionario.codigo, image)
-                    // Você pode lidar com o status da foto separadamente se necessário
-                    // Por exemplo: se photoStatus is UiState.Error, mostrar um toast
-                }
-                
                 _consumoStatus.value = UiState.Success(response.message)
                 _ranking.value = repository.getRanking()
             } catch (e: HttpException) {
@@ -107,15 +99,6 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
             } catch (e: Exception) {
                 _consumoStatus.value = UiState.Error(e.message ?: "Erro desconhecido")
             }
-        }
-    }
-    
-    private suspend fun sendPhoto(codigo: String, base64Image: String): UiState<String> {
-        return try {
-            val response = repository.sendPhoto(codigo, base64Image)
-            UiState.Success(response.message)
-        } catch (e: Exception) {
-            UiState.Error(e.message ?: "Erro ao enviar foto")
         }
     }
 }
