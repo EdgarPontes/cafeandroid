@@ -90,15 +90,23 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
         }
     }
 
-    fun registrarConsumo(valor: Double) {
+    fun registrarConsumo(valor: Double, fotoBase64: String? = null) {
         val funcionario = _selectedFuncionario.value ?: return
         viewModelScope.launch {
             _consumoStatus.value = UiState.Loading
             try {
                 val response = repository.registrarConsumo(funcionario.codigo, funcionario.nome, valor)
+                
+                if (response.id != -1 && fotoBase64 != null) {
+                    try {
+                        repository.enviarFoto(response.id, funcionario.codigo, fotoBase64)
+                    } catch (e: Exception) {
+                        Log.e("MainViewModel", "Erro ao enviar foto: ${e.message}")
+                    }
+                }
+
                 if (response.message == "Consumo salvo localmente (modo offline)") {
                     _consumoStatus.value = UiState.Success(response.message)
-                    // Do not update ranking from API if it was saved locally (no connection)
                 } else {
                     _consumoStatus.value = UiState.Success(response.message)
                     _ranking.value = repository.getRanking()
