@@ -18,7 +18,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("Long", "API_TIMEOUT_SECONDS", "10L")
+        buildConfigField("Long", "API_TIMEOUT_SECONDS", "5L")
     }
 
     buildTypes {
@@ -68,6 +68,13 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    // CameraX
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.camera.extensions)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

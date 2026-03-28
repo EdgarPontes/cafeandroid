@@ -15,6 +15,9 @@ interface CafeApi {
     @POST("api/consumo")
     suspend fun registrarConsumo(@Body request: ConsumoRequest): ConsumoResponse
 
+    @POST("api/fotos")
+    suspend fun enviarFoto(@Body request: FotoRequest): FotoResponse
+
     @GET("api/ranking/hoje")
     suspend fun getRankingHoje(): List<RankingItem>
 

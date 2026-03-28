@@ -24,6 +24,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
+import androidx.camera.view.LifecycleCameraController
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import java.io.ByteArrayOutputStream
 import br.com.sgsistemas.cafesg.data.Funcionario
 import br.com.sgsistemas.cafesg.data.RankingItem
 import androidx.compose.runtime.getValue
@@ -47,6 +62,35 @@ fun CafeSGApp(
     val ranking by viewModel.ranking.collectAsState() // Aqui você pega o ranking do ViewModel
     val funcionarios by viewModel.funcionarios.collectAsState()
     val status by viewModel.consumoStatus.collectAsState()
+
+    val context = LocalContext.current
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            hasCameraPermission = granted
+        }
+    )
+
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) {
+            launcher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val cameraController = remember {
+        LifecycleCameraController(context).apply {
+            cameraSelector = androidx.camera.core.CameraSelector.DEFAULT_FRONT_CAMERA
+        }
+    }
 
     var clickCount by remember { mutableIntStateOf(0) }
     var showIpDialog by remember { mutableStateOf(false) }
@@ -114,7 +158,10 @@ fun CafeSGApp(
                         UserHeaderCard(funcionario)
                         Spacer(modifier = Modifier.height(16.dp))
                         ValueSelectionCard(
-                            onValueSelected = { viewModel.registrarConsumo(it) },
+                            cameraController = cameraController,
+                            onValueSelected = { valor, fotoBase64 -> 
+                                viewModel.registrarConsumo(valor, fotoBase64) 
+                            },
                             onCancel = { viewModel.selectFuncionario(null) }
                         )
                     }
@@ -260,14 +307,13 @@ fun UserHeaderCard(funcionario: Funcionario) {
 
 @Composable
 fun ValueSelectionCard(
-    onValueSelected: (Double) -> Unit,
+    cameraController: LifecycleCameraController,
+    onValueSelected: (Double, String?) -> Unit,
     onCancel: () -> Unit
 ) {
-
+    val context = LocalContext.current
     var customValue by remember { mutableStateOf("") }
-
     val valuesHistory = remember { mutableStateListOf<Double>() }
-
     val total = valuesHistory.sum()
 
     Card(
@@ -275,11 +321,25 @@ fun ValueSelectionCard(
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         shape = RoundedCornerShape(16.dp)
     ) {
-
         Column(
             modifier = Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, GoldTan, CircleShape)
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                CameraPreview(
+                    controller = cameraController,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "Adicionar Créditos",
@@ -377,11 +437,35 @@ fun ValueSelectionCard(
 
             Button(
                 onClick = {
-
                     if (total > 0) {
-                        onValueSelected(total)
-                    }
+                        cameraController.takePicture(
+                            ContextCompat.getMainExecutor(context),
+                            object : ImageCapture.OnImageCapturedCallback() {
+                                override fun onCaptureSuccess(image: ImageProxy) {
+                                    val buffer = image.planes[0].buffer
+                                    val bytes = ByteArray(buffer.remaining())
+                                    buffer.get(bytes)
+                                    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                    
+                                    val matrix = Matrix()
+                                    matrix.postRotate(image.imageInfo.rotationDegrees.toFloat())
+                                    matrix.postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
+                                    val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                                    
+                                    val outputStream = ByteArrayOutputStream()
+                                    rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+                                    val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                                    
+                                    onValueSelected(total, base64)
+                                    image.close()
+                                }
 
+                                override fun onError(exception: ImageCaptureException) {
+                                    onValueSelected(total, null)
+                                }
+                            }
+                        )
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(

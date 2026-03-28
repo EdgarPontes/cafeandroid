@@ -95,15 +95,6 @@ class CafeRepository(
         }
     }
 
-    suspend fun sendPhoto(codigo: String, base64Image: String): FotoResponse {
-        return try {
-            api.sendPhoto(FotoRequest(codigo = codigo, imagem = base64Image))
-        } catch (e: Exception) {
-            Log.e("CafeRepository", "Erro ao enviar foto: ${e.message}")
-            FotoResponse("Erro ao enviar foto: ${e.message}") // Retorna um erro na resposta da foto
-        }
-    }
-
     suspend fun syncOfflineConsumos() {
         val pending = consumoOfflineDao.getAllPending()
         if (pending.isEmpty()) return
@@ -111,7 +102,6 @@ class CafeRepository(
         pending.forEach { consumo ->
             try {
                 api.registrarConsumo(ConsumoRequest(consumo.codigo, consumo.nome, consumo.valor))
-                // TODO: Adicionar lógica para sincronizar fotos offline se implementado
                 consumoOfflineDao.delete(consumo)
             } catch (e: Exception) {
                 Log.e("CafeRepository", "Erro ao sincronizar consumo offline")

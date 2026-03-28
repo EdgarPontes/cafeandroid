@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
+import java.io.IOException
+import android.util.Log
 
 sealed class UiState<out T> {
     object Idle : UiState<Nothing>()
@@ -64,6 +66,12 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
                 } else {
                     _initialDataStatus.value = InitialDataUiState.OtherError(e.message() ?: "Erro desconhecido de HTTP ao carregar dados iniciais.")
                 }
+            } catch (e: IOException) {
+                // Network error, proceed with local data
+                Log.e("MainViewModel", "Network error during initial data load: ${e.message}. Loading from local DB.")
+                _funcionarios.value = repository.getFuncionarios()
+                _ranking.value = repository.getRanking()
+                _initialDataStatus.value = InitialDataUiState.Success
             } catch (e: Exception) {
                 _initialDataStatus.value = InitialDataUiState.OtherError(e.message ?: "Erro desconhecido ao carregar dados iniciais.")
             }
@@ -88,8 +96,13 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
             _consumoStatus.value = UiState.Loading
             try {
                 val response = repository.registrarConsumo(funcionario.codigo, funcionario.nome, valor)
-                _consumoStatus.value = UiState.Success(response.message)
-                _ranking.value = repository.getRanking()
+                if (response.message == "Consumo salvo localmente (modo offline)") {
+                    _consumoStatus.value = UiState.Success(response.message)
+                    // Do not update ranking from API if it was saved locally (no connection)
+                } else {
+                    _consumoStatus.value = UiState.Success(response.message)
+                    _ranking.value = repository.getRanking()
+                }
             } catch (e: HttpException) {
                 if (e.code() == 403) {
                     _consumoStatus.value = UiState.Error("Dispositivo não autorizado a registrar o consumo!")
