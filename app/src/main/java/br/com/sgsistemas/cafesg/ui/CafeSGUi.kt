@@ -36,6 +36,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.view.LifecycleCameraController
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import java.io.ByteArrayOutputStream
@@ -327,7 +328,7 @@ fun ValueSelectionCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(1.dp)
                     .clip(CircleShape)
                     .border(2.dp, GoldTan, CircleShape)
                     .background(Color.Black),
@@ -335,7 +336,7 @@ fun ValueSelectionCard(
             ) {
                 CameraPreview(
                     controller = cameraController,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.size(1.dp).alpha(0f)
                 )
             }
 
