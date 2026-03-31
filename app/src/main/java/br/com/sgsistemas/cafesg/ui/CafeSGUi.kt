@@ -60,7 +60,7 @@ fun CafeSGApp(
     onConfigChanged: (String, Boolean) -> Unit
 ) {
     val selectedFuncionario by viewModel.selectedFuncionario.collectAsState()
-    val ranking by viewModel.ranking.collectAsState() // Aqui você pega o ranking do ViewModel
+    val ranking by viewModel.ranking.collectAsState()
     val funcionarios by viewModel.funcionarios.collectAsState()
     val status by viewModel.consumoStatus.collectAsState()
 
@@ -127,10 +127,9 @@ fun CafeSGApp(
             if (selectedFuncionario == null) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // CORREÇÃO: Passando o ranking para dentro do UserSearch
                 UserSearch(
                     funcionarios = funcionarios,
-                    ranking = ranking, // <-- Adicione este parâmetro
+                    ranking = ranking,
                     isRankingEnabled = isRankingEnabled,
                     onFuncionarioSelected = { viewModel.selectFuncionario(it) }
                 )
@@ -313,7 +312,6 @@ fun ValueSelectionCard(
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
-    var customValue by remember { mutableStateOf("") }
     val valuesHistory = remember { mutableStateListOf<Double>() }
     val total = valuesHistory.sum()
 
@@ -368,11 +366,8 @@ fun ValueSelectionCard(
             val values = listOf(0.25, 0.50, 1.00)
 
             Column {
-
                 for (i in 0 until values.size step 2) {
-
                     Row(modifier = Modifier.fillMaxWidth()) {
-
                         ValueButton(
                             value = values[i],
                             onClick = { valuesHistory.add(values[i]) },
@@ -382,7 +377,6 @@ fun ValueSelectionCard(
                         )
 
                         if (i + 1 < values.size) {
-
                             ValueButton(
                                 value = values[i + 1],
                                 onClick = { valuesHistory.add(values[i + 1]) },
@@ -400,7 +394,6 @@ fun ValueSelectionCard(
             Row(
                 modifier = Modifier.fillMaxWidth()
             ) {
-
                 Button(
                     onClick = { valuesHistory.clear() },
                     modifier = Modifier
@@ -410,9 +403,7 @@ fun ValueSelectionCard(
                         containerColor = Color(0xFF7A1F1F)
                     )
                 ) {
-                    Text("Limpar",
-                        color = Color.White
-                    )
+                    Text("Limpar", color = Color.White)
                 }
 
                 Button(
@@ -428,9 +419,7 @@ fun ValueSelectionCard(
                         containerColor = Color(0xFF444444)
                     )
                 ) {
-                    Text("Desfazer",
-                    color = Color.White
-                    )
+                    Text("Desfazer", color = Color.White)
                 }
             }
 
@@ -513,7 +502,7 @@ fun ValueButton(value: Double, onClick: () -> Unit, modifier: Modifier = Modifie
 @Composable
 fun UserSearch(
     funcionarios: List<Funcionario>,
-    ranking: List<RankingItem>, // <-- ADICIONADO PARÂMETRO AQUI
+    ranking: List<RankingItem>,
     isRankingEnabled: Boolean,
     onFuncionarioSelected: (Funcionario) -> Unit
 ) {
@@ -527,29 +516,47 @@ fun UserSearch(
         focusRequester.requestFocus()
     }
 
-    // Lógica de filtro corrigida (removido erro de chaves)
+    // Lógica de filtro melhorada para priorizar códigos exatos e números baixos, ignorando zeros à esquerda
     val filtered = remember(query, funcionarios) {
+        if (query.isBlank()) return@remember emptyList()
+
         val isNumeric = query.all { it.isDigit() }
         if (isNumeric) {
-            funcionarios.filter { it.displayCodigo().contains(query) }
+            val queryInt = query.toIntOrNull()
+            funcionarios.filter { 
+                it.displayCodigo().contains(query) || 
+                (queryInt != null && it.displayCodigo().toIntOrNull() == queryInt)
+            }.sortedWith(compareBy(
+                { 
+                    val itemInt = it.displayCodigo().toIntOrNull()
+                    !(it.displayCodigo() == query || (itemInt != null && itemInt == queryInt)) 
+                }, // Prioriza correspondência exata ou numérica
+                { !it.displayCodigo().startsWith(query) }, // Prioriza quem começa com o número digitado
+                { it.displayCodigo().length }, // Prioriza números menores (ex: "8" antes de "000080")
+                { it.displayCodigo() }
+            ))
         } else {
-            if (query.isEmpty()) emptyList() // Changed from query.length < 3
-            else funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
+            funcionarios.filter { it.nome.contains(query, ignoreCase = true) }
+                .sortedBy { it.nome.length }
         }
     }
 
     val onSearchAction = {
         if (query.isNotEmpty()) {
             val isNumeric = query.all { it.isDigit() }
+            val queryInt = query.toIntOrNull()
             val match = if (isNumeric) {
-                funcionarios.find { it.displayCodigo() == query }
+                funcionarios.find { 
+                    it.displayCodigo() == query || 
+                    (queryInt != null && it.displayCodigo().toIntOrNull() == queryInt) 
+                }
             } else {
                 funcionarios.find { it.nome.equals(query, ignoreCase = true) }
             }
 
             if (match != null) {
                 val finalFunc = if (isVisitor) {
-                    Funcionario(codigo = "999999", nome = match.nome)
+                    Funcionario(codigo = "999999", nome = "${match.nome} (VISITANTE)")
                 } else {
                     match
                 }
@@ -566,7 +573,6 @@ fun UserSearch(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Se a busca estiver vazia, empurra para o meio
         if (query.isEmpty()) {
             Spacer(modifier = Modifier.weight(1f))
         }
@@ -616,21 +622,17 @@ fun UserSearch(
             Text(text = "Selecionar como visitante", color = Color.White, fontSize = 14.sp)
         }
 
-        // CONTEÚDO DINÂMICO
         Column(
             modifier = Modifier.weight(2f).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (query.isNotEmpty()) {
-                // Resultados da Busca
-                // Resultados da Busca
-                filtered.take(3).forEach { funcionario ->
+                filtered.take(10).forEach { funcionario ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clickable {
-                                // Se a checkbox de visitante estiver marcada, altera o objeto enviado
                                 val finalFunc = if (isVisitor) {
                                     Funcionario(
                                         codigo = "999999",
@@ -651,8 +653,7 @@ fun UserSearch(
                     }
                 }
             } else if (isRankingEnabled) {
-                // RODAPÉ: RANKING REAL
-                Spacer(modifier = Modifier.weight(1f)) // Empurra para o rodapé
+                Spacer(modifier = Modifier.weight(1f))
 
                 Text(
                     text = "TOP 3 CONSUMIDORES (MÊS)",
@@ -662,7 +663,6 @@ fun UserSearch(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Agora usamos o ranking que veio por parâmetro!
                 RankingPodium(ranking = ranking.take(3))
 
                 Spacer(modifier = Modifier.height(16.dp))
