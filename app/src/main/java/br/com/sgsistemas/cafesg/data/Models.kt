@@ -15,7 +15,8 @@ data class Funcionario(
 data class ConsumoRequest(
     val codigo: String,
     val nome: String,
-    val valor: Double
+    val valor: Double,
+    @SerializedName("data_hora") val dataHora: String? = null
 )
 
 data class ConsumoResponse(
