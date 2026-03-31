@@ -9,5 +9,6 @@ data class ConsumoOfflineEntity(
     val codigo: String,
     val nome: String,
     val valor: Double,
+    val fotoBase64: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 )

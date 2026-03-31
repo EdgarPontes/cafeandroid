@@ -95,16 +95,8 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
         viewModelScope.launch {
             _consumoStatus.value = UiState.Loading
             try {
-                val response = repository.registrarConsumo(funcionario.codigo, funcionario.nome, valor)
+                val response = repository.registrarConsumo(funcionario.codigo, funcionario.nome, valor, fotoBase64)
                 
-                if (response.id != -1 && fotoBase64 != null) {
-                    try {
-                        repository.enviarFoto(response.id, funcionario.codigo, fotoBase64)
-                    } catch (e: Exception) {
-                        Log.e("MainViewModel", "Erro ao enviar foto: ${e.message}")
-                    }
-                }
-
                 if (response.message == "Consumo salvo localmente (modo offline)") {
                     _consumoStatus.value = UiState.Success(response.message)
                 } else {

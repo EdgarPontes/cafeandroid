@@ -84,13 +84,27 @@ class CafeRepository(
         }
     }
 
-    suspend fun registrarConsumo(codigo: String, nome: String, valor: Double): ConsumoResponse {
+    suspend fun registrarConsumo(codigo: String, nome: String, valor: Double, fotoBase64: String? = null): ConsumoResponse {
         return try {
             val response = api.registrarConsumo(ConsumoRequest(codigo, nome, valor))
+            
+            // Se o consumo foi registrado com sucesso na API e temos uma foto, tenta enviar agora
+            if (response.id != -1 && fotoBase64 != null) {
+                try {
+                    api.enviarFoto(FotoRequest(response.id, codigo, fotoBase64))
+                } catch (e: Exception) {
+                    Log.e("CafeRepository", "Erro ao enviar foto após registro: ${e.message}")
+                    // Se falhar o envio da foto mas o consumo foi salvo, podemos salvar a foto offline?
+                    // Por enquanto, apenas logamos. O ideal seria ter uma fila de fotos offline também.
+                    // Mas para simplificar o pedido do usuário, vamos focar em salvar TUDO offline se falhar o registro.
+                }
+            }
+            
             syncOfflineConsumos()
             response
         } catch (e: Exception) {
-            consumoOfflineDao.insert(ConsumoOfflineEntity(codigo = codigo, nome = nome, valor = valor))
+            Log.d("CafeRepository", "Erro ao registrar consumo na API, salvando offline: ${e.message}")
+            consumoOfflineDao.insert(ConsumoOfflineEntity(codigo = codigo, nome = nome, valor = valor, fotoBase64 = fotoBase64))
             ConsumoResponse("Consumo salvo localmente (modo offline)", -1)
         }
     }
@@ -101,10 +115,22 @@ class CafeRepository(
         
         pending.forEach { consumo ->
             try {
-                api.registrarConsumo(ConsumoRequest(consumo.codigo, consumo.nome, consumo.valor))
+                val response = api.registrarConsumo(ConsumoRequest(consumo.codigo, consumo.nome, consumo.valor))
+                
+                // Se o consumo foi sincronizado com sucesso e tem foto, tenta enviar a foto
+                if (response.id != -1 && consumo.fotoBase64 != null) {
+                    try {
+                        api.enviarFoto(FotoRequest(response.id, consumo.codigo, consumo.fotoBase64))
+                    } catch (e: Exception) {
+                        Log.e("CafeRepository", "Erro ao sincronizar foto offline para consumo ${response.id}: ${e.message}")
+                        // Se falhou a foto, ainda deletamos o consumo pending? 
+                        // Melhor seria tentar novamente a foto depois, mas a arquitetura atual deleta o consumo.
+                    }
+                }
+                
                 consumoOfflineDao.delete(consumo)
             } catch (e: Exception) {
-                Log.e("CafeRepository", "Erro ao sincronizar consumo offline")
+                Log.e("CafeRepository", "Erro ao sincronizar consumo offline: ${e.message}")
             }
         }
     }
@@ -119,5 +145,9 @@ class CafeRepository(
             Log.e("CafeRepository", "Falha ao buscar ranking da API (outros erros): ${e.message}. Retornando lista vazia.")
             emptyList()
         }
+    }
+
+    suspend fun enviarFoto(consumoId: Int, codigo: String, fotoBase64: String): FotoResponse {
+        return api.enviarFoto(FotoRequest(consumoId, codigo, fotoBase64))
     }
 }

@@ -27,3 +27,13 @@ data class RankingItem(
     @SerializedName("NOME") val nome: String,
     @SerializedName("TOTAL") val total: Double
 )
+
+data class FotoRequest(
+    val id_consumo: Int,
+    val codigo: String,
+    val foto_base64: String
+)
+
+data class FotoResponse(
+    val message: String
+)
