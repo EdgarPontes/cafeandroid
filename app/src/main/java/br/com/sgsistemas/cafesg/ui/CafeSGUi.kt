@@ -320,6 +320,14 @@ fun ValueSelectionCard(
     val context = LocalContext.current
     val valuesHistory = remember { mutableStateListOf<Double>() }
     val total = valuesHistory.sum()
+    var isProcessing by remember { mutableStateOf(false) }
+
+    // Reseta isProcessing quando isLoading muda para false (fim do processo)
+    LaunchedEffect(isLoading) {
+        if (!isLoading) {
+            isProcessing = false
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -376,7 +384,7 @@ fun ValueSelectionCard(
                     Row(modifier = Modifier.fillMaxWidth()) {
                         ValueButton(
                             value = values[i],
-                            enabled = !isLoading,
+                            enabled = !isLoading && !isProcessing,
                             onClick = { valuesHistory.add(values[i]) },
                             modifier = Modifier
                                 .weight(1f)
@@ -386,7 +394,7 @@ fun ValueSelectionCard(
                         if (i + 1 < values.size) {
                             ValueButton(
                                 value = values[i + 1],
-                                enabled = !isLoading,
+                                enabled = !isLoading && !isProcessing,
                                 onClick = { valuesHistory.add(values[i + 1]) },
                                 modifier = Modifier
                                     .weight(1f)
@@ -404,7 +412,7 @@ fun ValueSelectionCard(
             ) {
                 Button(
                     onClick = { valuesHistory.clear() },
-                    enabled = !isLoading,
+                    enabled = !isLoading && !isProcessing,
                     modifier = Modifier
                         .weight(1f)
                         .padding(4.dp),
@@ -421,7 +429,7 @@ fun ValueSelectionCard(
                             valuesHistory.removeAt(valuesHistory.lastIndex)
                         }
                     },
-                    enabled = !isLoading,
+                    enabled = !isLoading && !isProcessing,
                     modifier = Modifier
                         .weight(1f)
                         .padding(4.dp),
@@ -437,7 +445,8 @@ fun ValueSelectionCard(
 
             Button(
                 onClick = {
-                    if (total > 0 && !isLoading) {
+                    if (total > 0 && !isLoading && !isProcessing) {
+                        isProcessing = true
                         cameraController.takePicture(
                             ContextCompat.getMainExecutor(context),
                             object : ImageCapture.OnImageCapturedCallback() {
@@ -461,20 +470,21 @@ fun ValueSelectionCard(
                                 }
 
                                 override fun onError(exception: ImageCaptureException) {
+                                    isProcessing = false
                                     onValueSelected(total, null)
                                 }
                             }
                         )
                     }
                 },
-                enabled = !isLoading,
+                enabled = !isLoading && !isProcessing,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GoldTan
                 )
             ) {
                 Text(
-                    text = if (isLoading) "AGUARDE O REGISTRO..." else "Confirmar",
+                    text = if (isLoading || isProcessing) "AGUARDE O REGISTRO..." else "Confirmar",
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -484,8 +494,8 @@ fun ValueSelectionCard(
 
             Text(
                 text = "Cancelar",
-                modifier = Modifier.clickable(enabled = !isLoading) { onCancel() },
-                color = if (isLoading) Color.DarkGray else Color.Gray,
+                modifier = Modifier.clickable(enabled = !isLoading && !isProcessing) { onCancel() },
+                color = if (isLoading || isProcessing) Color.DarkGray else Color.Gray,
                 style = MaterialTheme.typography.bodyLarge
             )
         }

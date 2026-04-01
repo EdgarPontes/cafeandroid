@@ -10,5 +10,8 @@ data class ConsumoOfflineEntity(
     val nome: String,
     val valor: Double,
     val fotoBase64: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val serverId: Int? = null,
+    val syncConsumoPending: Boolean = true,
+    val syncFotoPending: Boolean = true
 )

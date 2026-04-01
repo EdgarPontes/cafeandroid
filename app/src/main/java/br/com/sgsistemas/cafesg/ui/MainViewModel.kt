@@ -44,6 +44,10 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
     private val _initialDataStatus = MutableStateFlow<InitialDataUiState>(InitialDataUiState.Loading)
     val initialDataStatus: StateFlow<InitialDataUiState> = _initialDataStatus.asStateFlow()
 
+    private var lastRegistrationTime: Long = 0
+    private var lastRegistrationFuncionario: String? = null
+    private var lastRegistrationValor: Double = 0.0
+
     init {
         loadInitialData()
     }
@@ -92,12 +96,27 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
 
     fun registrarConsumo(valor: Double, fotoBase64: String? = null) {
         val funcionario = _selectedFuncionario.value ?: return
+        
+        // Proteção extra: Debounce de 5 segundos para o mesmo funcionário e valor
+        val currentTime = System.currentTimeMillis()
+        if (funcionario.codigo == lastRegistrationFuncionario && 
+            valor == lastRegistrationValor && 
+            (currentTime - lastRegistrationTime) < 5000) {
+            Log.w("MainViewModel", "Registro duplicado ignorado pelo debounce (5s): ${funcionario.nome}, R$ $valor")
+            return
+        }
+
+        // Atualiza rastreio de último registro
+        lastRegistrationTime = currentTime
+        lastRegistrationFuncionario = funcionario.codigo
+        lastRegistrationValor = valor
+
         viewModelScope.launch {
             _consumoStatus.value = UiState.Loading
             try {
                 val response = repository.registrarConsumo(funcionario.codigo, funcionario.nome, valor, fotoBase64)
                 
-                if (response.message == "Consumo salvo localmente (modo offline)") {
+                if (response.isOffline) {
                     _consumoStatus.value = UiState.Success(response.message)
                 } else {
                     _consumoStatus.value = UiState.Success(response.message)
@@ -107,7 +126,7 @@ class MainViewModel(private var repository: CafeRepository) : ViewModel() {
                 if (e.code() == 403) {
                     _consumoStatus.value = UiState.Error("Dispositivo não autorizado a registrar o consumo!")
                 } else {
-                    _consumoStatus.value = UiState.Error(e.message() ?: "Erro desconhecido de HTTP")
+                    _consumoStatus.value = UiState.Error("Erro no servidor (${e.code()}): ${e.message()}")
                 }
             } catch (e: Exception) {
                 _consumoStatus.value = UiState.Error(e.message ?: "Erro desconhecido")

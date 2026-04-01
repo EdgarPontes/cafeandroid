@@ -14,6 +14,8 @@ import br.com.sgsistemas.cafesg.BuildConfig
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class CafeRepository(
     baseUrl: String,
@@ -22,6 +24,7 @@ class CafeRepository(
 ) {
     private var api: CafeApi = createApi(baseUrl)
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+    private val syncMutex = Mutex()
 
     private fun createApi(baseUrl: String): CafeApi {
         val okHttpClient = OkHttpClient.Builder()
@@ -98,40 +101,71 @@ class CafeRepository(
                 try {
                     api.enviarFoto(FotoRequest(response.id, codigo, fotoBase64))
                 } catch (e: Exception) {
-                    Log.e("CafeRepository", "Erro ao enviar foto após registro: ${e.message}")
+                    Log.e("CafeRepository", "Erro ao enviar foto após registro: ${e.message}. Salvando para envio posterior.")
+                    // Se o consumo foi registrado mas a foto falhou, salva apenas para enviar a foto depois
+                    consumoOfflineDao.insert(ConsumoOfflineEntity(
+                        codigo = codigo,
+                        nome = nome,
+                        valor = valor,
+                        fotoBase64 = fotoBase64,
+                        serverId = response.id,
+                        syncConsumoPending = false, // Consumo já está no servidor
+                        syncFotoPending = true
+                    ))
+                    return response.copy(message = "Consumo registrado, foto será enviada em breve.")
                 }
             }
             
             syncOfflineConsumos()
             response
-        } catch (e: Exception) {
-            Log.d("CafeRepository", "Erro ao registrar consumo na API, salvando offline: ${e.message}")
+        } catch (e: IOException) {
+            Log.d("CafeRepository", "Erro de rede ao registrar consumo na API, salvando offline: ${e.message}")
             consumoOfflineDao.insert(ConsumoOfflineEntity(codigo = codigo, nome = nome, valor = valor, fotoBase64 = fotoBase64))
-            ConsumoResponse("Consumo salvo localmente (modo offline)", -1)
+            ConsumoResponse("Consumo salvo localmente (modo offline)", -1, isOffline = true)
+        } catch (e: Exception) {
+            Log.e("CafeRepository", "Erro de negócio ao registrar consumo: ${e.message}")
+            throw e
         }
     }
 
     suspend fun syncOfflineConsumos() {
-        val pending = consumoOfflineDao.getAllPending()
-        if (pending.isEmpty()) return
+        if (syncMutex.isLocked) return
         
-        pending.forEach { consumo ->
-            try {
-                val dataHora = dateFormat.format(Date(consumo.timestamp))
-                val response = api.registrarConsumo(ConsumoRequest(consumo.codigo, consumo.nome, consumo.valor, dataHora))
-                
-                // Se o consumo foi sincronizado com sucesso e tem foto, tenta enviar a foto
-                if (response.id != -1 && consumo.fotoBase64 != null) {
-                    try {
-                        api.enviarFoto(FotoRequest(response.id, consumo.codigo, consumo.fotoBase64))
-                    } catch (e: Exception) {
-                        Log.e("CafeRepository", "Erro ao sincronizar foto offline para consumo ${response.id}: ${e.message}")
+        syncMutex.withLock {
+            val pending = consumoOfflineDao.getAllPending()
+            if (pending.isEmpty()) return
+            
+            Log.d("CafeRepository", "Iniciando sincronização de ${pending.size} consumos offline...")
+            
+            pending.forEach { consumo ->
+                try {
+                    var currentServerId = consumo.serverId
+                    
+                    // 1. Sincroniza o consumo se pendente
+                    if (consumo.syncConsumoPending) {
+                        val dataHora = dateFormat.format(Date(consumo.timestamp))
+                        val response = api.registrarConsumo(ConsumoRequest(consumo.codigo, consumo.nome, consumo.valor, dataHora))
+                        if (response.id != -1) {
+                            currentServerId = response.id
+                        } else {
+                            throw Exception("Erro retornado pela API no sync offline")
+                        }
                     }
+
+                    // 2. Sincroniza a foto se pendente e tiver serverId
+                    if (consumo.syncFotoPending && currentServerId != null && consumo.fotoBase64 != null) {
+                        api.enviarFoto(FotoRequest(currentServerId, consumo.codigo, consumo.fotoBase64))
+                    }
+                    
+                    // Se chegou aqui sem Exception, ambos foram sincronizados (ou o que era necessário)
+                    consumoOfflineDao.delete(consumo)
+                } catch (e: IOException) {
+                    Log.e("CafeRepository", "Falha de conexão no sync offline: ${e.message}. Mantendo registro.")
+                    return@withLock // Para o sync atual, tenta novamente depois
+                } catch (e: Exception) {
+                    Log.e("CafeRepository", "Erro irrecuperável no sync offline para registro ${consumo.id}: ${e.message}")
+                    // Se for erro de negócio no sync, mantemos para segurança
                 }
-                
-                consumoOfflineDao.delete(consumo)
-            } catch (e: Exception) {
-                Log.e("CafeRepository", "Erro ao sincronizar consumo offline: ${e.message}")
             }
         }
     }

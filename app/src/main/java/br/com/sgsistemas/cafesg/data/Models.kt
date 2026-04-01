@@ -21,7 +21,8 @@ data class ConsumoRequest(
 
 data class ConsumoResponse(
     val message: String,
-    val id: Int
+    val id: Int,
+    val isOffline: Boolean = false
 )
 
 data class RankingItem(
