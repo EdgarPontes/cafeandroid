@@ -145,7 +145,11 @@ fun CafeSGApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(DarkBackground.copy(alpha = 0.9f))
-                    .clickable { viewModel.selectFuncionario(null) },
+                    .clickable { 
+                        if (status !is UiState.Loading) {
+                            viewModel.selectFuncionario(null) 
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -159,6 +163,7 @@ fun CafeSGApp(
                         Spacer(modifier = Modifier.height(16.dp))
                         ValueSelectionCard(
                             cameraController = cameraController,
+                            isLoading = status is UiState.Loading,
                             onValueSelected = { valor, fotoBase64 -> 
                                 viewModel.registrarConsumo(valor, fotoBase64) 
                             },
@@ -290,7 +295,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
 
             Column {
                 Text(
-                    text = if (funcionario.codigo == "999999") "${funcionario.nome.uppercase()}" else funcionario.nome.uppercase(),
+                    text = if (funcionario.codigo == "999999") funcionario.nome.uppercase() else funcionario.nome.uppercase(),
                     style = MaterialTheme.typography.titleLarge,
                     color = GoldTan,
                     fontWeight = FontWeight.Bold
@@ -308,6 +313,7 @@ fun UserHeaderCard(funcionario: Funcionario) {
 @Composable
 fun ValueSelectionCard(
     cameraController: LifecycleCameraController,
+    isLoading: Boolean,
     onValueSelected: (Double, String?) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -370,6 +376,7 @@ fun ValueSelectionCard(
                     Row(modifier = Modifier.fillMaxWidth()) {
                         ValueButton(
                             value = values[i],
+                            enabled = !isLoading,
                             onClick = { valuesHistory.add(values[i]) },
                             modifier = Modifier
                                 .weight(1f)
@@ -379,6 +386,7 @@ fun ValueSelectionCard(
                         if (i + 1 < values.size) {
                             ValueButton(
                                 value = values[i + 1],
+                                enabled = !isLoading,
                                 onClick = { valuesHistory.add(values[i + 1]) },
                                 modifier = Modifier
                                     .weight(1f)
@@ -396,6 +404,7 @@ fun ValueSelectionCard(
             ) {
                 Button(
                     onClick = { valuesHistory.clear() },
+                    enabled = !isLoading,
                     modifier = Modifier
                         .weight(1f)
                         .padding(4.dp),
@@ -412,6 +421,7 @@ fun ValueSelectionCard(
                             valuesHistory.removeAt(valuesHistory.lastIndex)
                         }
                     },
+                    enabled = !isLoading,
                     modifier = Modifier
                         .weight(1f)
                         .padding(4.dp),
@@ -427,7 +437,7 @@ fun ValueSelectionCard(
 
             Button(
                 onClick = {
-                    if (total > 0) {
+                    if (total > 0 && !isLoading) {
                         cameraController.takePicture(
                             ContextCompat.getMainExecutor(context),
                             object : ImageCapture.OnImageCapturedCallback() {
@@ -457,13 +467,14 @@ fun ValueSelectionCard(
                         )
                     }
                 },
+                enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GoldTan
                 )
             ) {
                 Text(
-                    "Confirmar",
+                    text = if (isLoading) "AGUARDE O REGISTRO..." else "Confirmar",
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -473,8 +484,8 @@ fun ValueSelectionCard(
 
             Text(
                 text = "Cancelar",
-                modifier = Modifier.clickable { onCancel() },
-                color = Color.Gray,
+                modifier = Modifier.clickable(enabled = !isLoading) { onCancel() },
+                color = if (isLoading) Color.DarkGray else Color.Gray,
                 style = MaterialTheme.typography.bodyLarge
             )
         }
@@ -482,15 +493,19 @@ fun ValueSelectionCard(
 }
 
 @Composable
-fun ValueButton(value: Double, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ValueButton(value: Double, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(80.dp),
         colors = ButtonDefaults.buttonColors(containerColor = ButtonBrown),
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(
-            text = "R$ ${String.format("%.2f", value)}",
+            text = buildString {
+                append("R$ ")
+                append(String.format("%.2f", value))
+            },
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White
@@ -721,7 +736,7 @@ fun PodiumItem(item: RankingItem, position: Int, height: androidx.compose.ui.uni
 @Composable
 fun FeedbackOverlay(status: UiState<String>, onDismiss: () -> Unit) {
     val color = if (status is UiState.Success) Color(0xFF4CAF50) else Color(0xFFF44336)
-    val text = if (status is UiState.Success) (status as UiState.Success).data else (status as UiState.Error).message
+    val text = if (status is UiState.Success) status.data else (status as UiState.Error).message
 
     Box(
         modifier = Modifier
